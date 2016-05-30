@@ -1,5 +1,266 @@
 # nightwatchDoc #
 
+## 使用NightWatch ##
+
+### 编写测试 ###
+
+使用合适的CSS选择器来定位页面上的元素，Nightwatch让我们能够非常容易地编写自动化端到端测试。
+
+在我们的项目中创建另外的文件夹用于测试，例如：`tests`。文件夹中的每个文件都会被Nightwatch测试运行期加载为一个测试。一个基本的测试应该看起来像这样：
+
+    module.exports = {
+    	'Demo test Google' : function (browser) {
+      		browser
+      			.url('http://www.google.com')
+      			.waitForElementVisible('body', 1000)
+      			.setValue('input[type=text]', 'nightwatch')
+      			.waitForElementVisible('button[name=btnG]', 1000)
+      			.click('button[name=btnG]')
+      			.pause(1000)
+      			.assert.containsText('#main', 'Night Watch')
+      			.end();
+    	}
+    };
+    
+一个测试也可以有多个步骤，如果需要的话：
+
+    module.exports = {
+    	'step one' : function (browser) {
+    		browser
+    			.url('http://www.google.com')
+    			.waitForElementVisible('body', 1000)
+    			.setValue('input[type=text]', 'nightwatch')
+    			.waitForElementVisible('button[name=btnG]', 1000)
+    	},
+    	
+    	'step two' : function (browser) {
+    		browser
+    			.click('button[name=btnG]')
+    			.pause(1000)
+    			.assert.containsText('#main', 'Night Watch')
+    			.end();
+    	}
+    };
+    
+测试也可以写成这种格式：
+
+    this.demoTestGoogle = function (browser) {
+    	browser
+    		.url('http://www.google.com')
+    		.waitForElementVisible('body', 1000)
+    		.setValue('input[type=text]', 'nightwatch')
+    		.waitForElementVisible('button[name=btnG]', 1000)
+    		.click('button[name=btnG]')
+    		.pause(1000)
+    		.assert.containsText('#main', 'The Night Watch')
+    		.end();
+    };
+    
+### 使用Xpath ###
+
+Nightwatch也支持xpath选择器。要切换到使用xpath选择，在我们的测试中，可以调用useXpath()方法，下面的例子中就可以看到。要切换回CSS，调用useCss()。
+想要一直使用xpath作为默认的选择器策略，在测试设置中设置`"use_xpath": true`。
+
+    this.demoTestGoogle = function (browser) {
+    	browser
+    		.useXpath() // every selector now must be xpath
+    		.click("//tr[@data-recordid]/span[text()='Search Text']")
+    		.useCss() // we're back to CSS now
+    		.setValue('input[type=text]', 'nightwatch')
+    };
+
+### BDD 期望断言 ###
+从0.7版本开始，Nightwatch介绍了一种新的BDD风格的断言库，极大地提升了断言的灵活性和可读性。
+`expert`断言使用Chai框架里的`Expert`api的一个子集，当前只能用于元素上。下面是一个例子：
+
+    module.exports = {
+    	'Demo test Google' : function (client) {
+    		client
+    			.url('http://google.no')
+    			.pause(1000);
+    	    // expect element  to be present in 1000ms
+    		client.expect.element('body').to.be.present.before(1000);
+    		
+    		// expect element <#lst-ib> to have css property 'display'
+    		client.expect.element('#lst-ib').to.have.css('display');
+    		
+    		// expect element  to have attribute 'class' which contains text 'vasq'
+    		client.expect.element('body').to.have.attribute('class').which.contains('vasq');
+    		
+    		// expect element <#lst-ib> to be an input tag
+    		client.expect.element('#lst-ib').to.be.an('input');
+    		
+    		// expect element <#lst-ib> to be visible
+    		client.expect.element('#lst-ib').to.be.visible;
+    		
+    		client.end();
+    	}
+    };
+    
+`expect`接口提供了一种更灵活和流畅的语言来定义断言，极大地提升了现有的`assert`断言。唯一美中不足就是不能再继续链式断言，并且现在还不支持自定义消息。
+
+要查看可用的`expect`断言，查看[API文档](http://nightwatchjs.org/api/#expect)。
+
+### 测试钩子 ###
+
+Nightwatch 提供了标准的`before`/`after`和`beforeEach`/`afterEach`钩子，让我们在测试中使用。
+
+`before`和`after`会分别在测试套执行之前和之后运行，而`beforeEach`和`afterEach`则分别在每个测试步骤之前和之后执行。
+
+这些方法都以Nightwatch实例作为参数。
+
+示例：
+
+    module.exports = {
+    	before : function(browser) {
+    		console.log('Setting up...');
+    	},
+    	
+    	after : function(browser) {
+    		console.log('Closing down...');
+    	},
+    	
+    	beforeEach : function(browser) {
+    	
+    	},
+    	
+    	afterEach : function() {
+    	
+    	},
+    	
+    	'step one' : function (browser) {
+    		browser
+    		// ...
+    	},
+    	
+    	'step two' : function (browser) {
+    		browser
+    		// ...
+    		.end();
+    	}
+    };
+	
+上面的例子中，方法的调用顺序如下：
+
+`before(), beforeEach(), "step one", afterEach(), beforeEach(), "step two", afterEach(), after()`
+
+### 异步测试钩子 ###
+
+所有的`before[Each]`和`after[Each]`也都可以进行异步操作，这时候就需要传递`callback`作为第二个参数。
+**在异步操作完成时，必须调用`done`函数作为最后一步，否则会引起超时错误。**
+
+#### beforeEach & afterEach示例 ####
+
+    module.exports = {
+    	beforeEach: function(browser, done) {
+    		// performing an async operation
+    		setTimeout(function() {
+    	    	// finished async duties
+    			done();
+    		}, 100);
+    	},
+    	
+    	afterEach: function(browser, done) {
+    		// performing an async operation
+    		setTimeout(function() {
+      			// finished async duties
+      			done();
+    			}, 200);
+    	}
+    };
+
+#### 控制`done`调用超时 ####
+
+默认情况下，`done`调用超时时间设置在10秒（单元测试是2秒）。在某些情况下这个时间可能不够，为了避免出现超时错误，我们可以提高超时时间，只要在我们的外部全局文件中定义一个`asyncHookTimeout`属性（以毫秒为单位）。
+
+例如，参考提供的[globalModule](https://github.com/nightwatchjs/nightwatch/blob/master/examples/globalsModule.js#L20)示例。
+
+#### 显式地将测试置失败 ####
+
+要在测试钩子里内部将测试置失败，只要简单地使用`Error`参数来调用`done`即可。
+
+    module.exports = {
+    	afterEach: function(browser, done) {
+    		// performing an async operation
+    		performAsync(function(err) {
+      			if (err) {
+        			done(err);
+      			}
+      			// ...
+    		});
+    	}
+    };
+
+### 外部全局变量 ###
+
+大多数情况下，将我们的全局变量定义在一个外部文件中会更有用。这要求我们在globals_path属性中指定，而不是在nightwatch.json中定义。
+
+我们还可以按需为每个测试环境覆盖全局变量。比如说我们要在本地和远程机器上运行测试。大多数时候我们会需要不同的设置
+
+#### 全局钩子 ####
+
+用于测试套的钩子同样可以全局使用，可以查看下面的例子。如果是全局钩子，那么`beforeEach`和`afterEach`关联的就是一个测试套，他们分别在测试套之前和之后运行。
+
+#### 全局设定 ####
+
+有不少全局变量保存了测试的设置，这些设置能够控制测试执行方式。这些内容在示例[globalModule](https://github.com/nightwatchjs/nightwatch/blob/master/examples/globalsModule.js)中有详细细节。
+
+示例：
+
+    module.exports = {
+    	'default' : {
+    		isLocal : true,
+    	},
+    	
+    	'integration' : {
+    		isLocal : false
+    	},
+    	
+    	// External before hook is ran at the beginning of the tests run, before creating the Selenium session
+    	before: function(done) {
+    		// run this only for the local-env
+    		if (this.isLocal) {
+      			// start the local server
+      			App.startServer(function() {
+        			// server listening
+        			done();
+      			});
+      		} else {
+      			done();
+      		}
+      	},
+      	
+      	// External after hook is ran at the very end of the tests run, after closing the Selenium session
+      	after: function(done) {
+      		// run this only for the local-env
+    		if (this.isLocal) {
+      			// start the local server
+      			App.stopServer(function() {
+        			// shutting down
+        			done();
+      			});
+    		} else {
+      			done();
+    		}
+    	},
+    	
+    	// This will be run before each test suite is started
+    	beforeEach: function(browser, done) {
+    		// getting the session info
+    		browser.status(function(result) {
+      			console.log(result.value);
+      			done();
+    		});
+    	},
+    	
+    	// This will be run after each test suite is finished
+    	afterEach: function(browser, done) {
+    		console.log(browser.currentTest);
+    		done();
+    	}
+    };
+
+
 ## 运行测试##
 
 ### 测试运行器 ###
@@ -65,10 +326,10 @@ Nightwatch包含了一个命令行测试运行器，它让我们能够更容易�
 `--group`|`-g`| |仅运行指定的测试组
 `--skipgroup`|`-s`| |跳过一个或多个测试组。
 `--filter`|`-f`| |指定一个过滤器作为文件名格式,加载测试文件时仅加载符合要求的文件。
-`--tag`|`-a`| |Filter test modules by tags. Only tests that have the specified tags will be loaded.
-`--skiptags`| | |Skips tests that have the specified tag or tags (comma separated).
-`--retries`| | |Retries failed or errored testcases up to the specified number of times. Retrying a testcase will also retry the beforeEach and afterEach hooks, if any.
-`--suiteRetries`| | |Retries failed or errored testsuites (test modules) up to the specified number of times. Retrying a testsuite will also retry the before and after hooks (in addition to the global beforeEach and afterEach respectively), if any are defined on the testsuite.
+`--tag`|`-a`| |通过标签过滤测试模块。只有指定此标签的测试会被加载。
+`--skiptags`| | |跳过指定标签的测试（多个标签以comma分隔)。
+`--retries`| | |重试失败或错误的测试用例最多指定次数。
+`--suiteRetries`| | |重试失败或错误的测试套最多指定次数。
 
 ## 扩展NightWatch
 ### 自定义命令
